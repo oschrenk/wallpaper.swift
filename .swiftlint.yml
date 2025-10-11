@@ -1,0 +1,30 @@
+included:
+  - Sources/
+  - Tests/
+strict: true
+opt_in_rules:
+  - indentation_width
+line_length:
+  warning: 100
+  error: 100
+  ignores_comments: true
+indentation_width:
+  indentation_width: 2
+identifier_name:
+  excluded: # excluded via string array
+    - at
+    - f
+    - id
+    - in
+    - s
+    - to
+type_name:
+  excluded:
+    - On
+    - T
+nesting:
+  type_level:
+    warning: 2
+    error: 2
+trailing_comma:
+  mandatory_comma: true
