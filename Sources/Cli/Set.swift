@@ -47,10 +47,18 @@ struct Set: ParsableCommand {
 
     let workspace = NSWorkspace.shared
 
+    // Configure wallpaper options
+    // imageScaling: .scaleProportionallyUpOrDown fills the entire screen while maintaining
+    // aspect ratio, centering the image and cropping any excess
+    let options: [NSWorkspace.DesktopImageOptionKey: Any] = [
+      .imageScaling: NSImageScaling.scaleProportionallyUpOrDown,
+      .allowClipping: true,
+    ]
+
     // Set wallpaper
     for screen in screensToUpdate {
       do {
-        try workspace.setDesktopImageURL(fileURL, for: screen, options: [:])
+        try workspace.setDesktopImageURL(fileURL, for: screen, options: options)
         let name = screen.localizedName
         let index = availableScreens.firstIndex(of: screen) ?? -1
         print("Set wallpaper for screen \(index): \(name)")
