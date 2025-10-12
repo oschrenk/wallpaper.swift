@@ -1,7 +1,6 @@
 import AppKit
 import ArgumentParser
 import Foundation
-import UniformTypeIdentifiers
 
 /// `wallpaper set`
 ///
@@ -30,145 +29,6 @@ struct Set: ParsableCommand {
     return wallpaperDir
   }
 
-  /// Calculate scaled dimensions for an image to fit screen (accounting for margin)
-  private func calculateScaledDimensions(
-    imageSize: CGSize,
-    screen: NSScreen,
-    marginTop: Int
-  ) -> (width: Int, height: Int) {
-    let screenWidth = Int(screen.frame.width)
-    let screenHeight = Int(screen.frame.height)
-    // Available height for image after accounting for margin
-    let availableHeight = screenHeight - marginTop
-
-    let imageAspect = imageSize.width / imageSize.height
-    let availableAspect = CGFloat(screenWidth) / CGFloat(availableHeight)
-
-    if imageAspect >= availableAspect {
-      // Image is wider - scale to match available height
-      let scaleFactor = CGFloat(availableHeight) / imageSize.height
-      return (Int(imageSize.width * scaleFactor), availableHeight)
-    } else {
-      // Image is taller - scale to match screen width
-      let scaleFactor = CGFloat(screenWidth) / imageSize.width
-      return (screenWidth, Int(imageSize.height * scaleFactor))
-    }
-  }
-
-  /// Create a path with rounded corners
-  private func createRoundedRectPath(rect: CGRect, cornerRadius: CGFloat) -> CGPath {
-    let path = CGMutablePath()
-    let maxRadius = min(rect.width, rect.height) / 2
-    let radius = min(cornerRadius, maxRadius)
-
-    path.move(to: CGPoint(x: rect.minX + radius, y: rect.minY))
-    path.addLine(to: CGPoint(x: rect.maxX - radius, y: rect.minY))
-    path.addArc(
-      tangent1End: CGPoint(x: rect.maxX, y: rect.minY),
-      tangent2End: CGPoint(x: rect.maxX, y: rect.minY + radius),
-      radius: radius
-    )
-    path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - radius))
-    path.addArc(
-      tangent1End: CGPoint(x: rect.maxX, y: rect.maxY),
-      tangent2End: CGPoint(x: rect.maxX - radius, y: rect.maxY),
-      radius: radius
-    )
-    path.addLine(to: CGPoint(x: rect.minX + radius, y: rect.maxY))
-    path.addArc(
-      tangent1End: CGPoint(x: rect.minX, y: rect.maxY),
-      tangent2End: CGPoint(x: rect.minX, y: rect.maxY - radius),
-      radius: radius
-    )
-    path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + radius))
-    path.addArc(
-      tangent1End: CGPoint(x: rect.minX, y: rect.minY),
-      tangent2End: CGPoint(x: rect.minX + radius, y: rect.minY),
-      radius: radius
-    )
-    path.closeSubpath()
-
-    return path
-  }
-
-  /// Render image with margin and optional rounded corners into a CGImage
-  private func renderImageWithMargin(
-    cgImage: CGImage,
-    scaledSize: (width: Int, height: Int),
-    screen: NSScreen,
-    marginTop: Int,
-    borderRadius: Int?
-  ) throws -> CGImage {
-    let screenWidth = Int(screen.frame.width)
-    let screenHeight = Int(screen.frame.height)
-
-    guard let context = CGContext(
-      data: nil,
-      width: screenWidth,
-      height: screenHeight,
-      bitsPerComponent: 8,
-      bytesPerRow: 0,
-      space: CGColorSpaceCreateDeviceRGB(),
-      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-    ) else {
-      throw ValidationError("Failed to create graphics context")
-    }
-
-    // Fill entire canvas with black
-    context.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
-    context.fill(CGRect(x: 0, y: 0, width: screenWidth, height: screenHeight))
-
-    // Available area for image (from y: 0 to y: screenHeight - marginTop)
-    let availableHeight = screenHeight - marginTop
-
-    // Position image at bottom, centered horizontally
-    let xOffset = (screenWidth - scaledSize.width) / 2
-    let imageRect = CGRect(
-      x: xOffset,
-      y: 0,
-      width: scaledSize.width,
-      height: scaledSize.height
-    )
-
-    // Clip to available area first to prevent overflow into margin
-    let availableRect = CGRect(x: 0, y: 0, width: screenWidth, height: availableHeight)
-
-    if let radius = borderRadius, radius > 0 {
-      // Create clipping path that combines available area with rounded corners
-      let clippingRect = imageRect.intersection(availableRect)
-      let roundedPath = createRoundedRectPath(rect: clippingRect, cornerRadius: CGFloat(radius))
-      context.addPath(roundedPath)
-      context.clip()
-    } else {
-      // Just clip to available area
-      context.clip(to: availableRect)
-    }
-
-    context.draw(cgImage, in: imageRect)
-
-    guard let finalImage = context.makeImage() else {
-      throw ValidationError("Failed to create final image")
-    }
-    return finalImage
-  }
-
-  /// Save a CGImage to disk as PNG
-  private func saveImage(_ cgImage: CGImage, to url: URL) throws {
-    guard let destination = CGImageDestinationCreateWithURL(
-      url as CFURL,
-      UTType.png.identifier as CFString,
-      1,
-      nil
-    ) else {
-      throw ValidationError("Failed to create image destination")
-    }
-
-    CGImageDestinationAddImage(destination, cgImage, nil)
-    guard CGImageDestinationFinalize(destination) else {
-      throw ValidationError("Failed to save manipulated image")
-    }
-  }
-
   /// Create a manipulated version of the image with margin and/or rounded corners
   private func createManipulatedImage(
     sourceURL: URL,
@@ -176,32 +36,18 @@ struct Set: ParsableCommand {
     marginTop: Int,
     borderRadius: Int?
   ) throws -> URL {
-    guard
-      let imageSource = CGImageSourceCreateWithURL(sourceURL as CFURL, nil),
-      let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil)
-    else {
-      throw ValidationError("Failed to load image")
-    }
-
-    let imageSize = CGSize(width: cgImage.width, height: cgImage.height)
-    let scaledSize = calculateScaledDimensions(
-      imageSize: imageSize,
-      screen: screen,
-      marginTop: marginTop
-    )
-    let finalImage = try renderImageWithMargin(
-      cgImage: cgImage,
-      scaledSize: scaledSize,
-      screen: screen,
-      marginTop: marginTop,
-      borderRadius: borderRadius
-    )
-
     let tempDir = try getTempWallpaperDirectory()
     let timestamp = Date().timeIntervalSince1970
     let outputURL = tempDir.appendingPathComponent("wallpaper-\(timestamp).png")
 
-    try saveImage(finalImage, to: outputURL)
+    try ImageManipulator.createManipulatedImage(
+      sourceURL: sourceURL,
+      screen: screen,
+      marginTop: marginTop,
+      borderRadius: borderRadius,
+      outputURL: outputURL
+    )
+
     return outputURL
   }
 
