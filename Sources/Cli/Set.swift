@@ -1,6 +1,7 @@
 import AppKit
 import ArgumentParser
 import Foundation
+import UniformTypeIdentifiers
 
 /// `wallpaper set`
 ///
@@ -9,6 +10,127 @@ struct Set: ParsableCommand {
   static var configuration = CommandConfiguration(
     abstract: "Set wallpaper for one or more displays"
   )
+
+  /// Get or create the temporary wallpaper directory
+  private func getTempWallpaperDirectory() throws -> URL {
+    let homeDir = FileManager.default.homeDirectoryForCurrentUser
+    let wallpaperDir = homeDir
+      .appendingPathComponent(".local")
+      .appendingPathComponent("share")
+      .appendingPathComponent("wallpaper")
+
+    if !FileManager.default.fileExists(atPath: wallpaperDir.path) {
+      try FileManager.default.createDirectory(
+        at: wallpaperDir,
+        withIntermediateDirectories: true,
+        attributes: nil
+      )
+    }
+
+    return wallpaperDir
+  }
+
+  /// Calculate scaled dimensions for an image to fit screen
+  private func calculateScaledDimensions(
+    imageSize: CGSize,
+    screen: NSScreen
+  ) -> (width: Int, height: Int) {
+    let screenWidth = Int(screen.frame.width)
+    let screenHeight = Int(screen.frame.height)
+    let imageAspect = imageSize.width / imageSize.height
+    let screenAspect = screen.frame.width / screen.frame.height
+
+    if imageAspect >= screenAspect {
+      let scaleFactor = screen.frame.height / imageSize.height
+      return (Int(imageSize.width * scaleFactor), screenHeight)
+    } else {
+      let scaleFactor = screen.frame.width / imageSize.width
+      return (screenWidth, Int(imageSize.height * scaleFactor))
+    }
+  }
+
+  /// Render image with margin into a CGImage
+  private func renderImageWithMargin(
+    cgImage: CGImage,
+    scaledSize: (width: Int, height: Int),
+    screen: NSScreen,
+    marginTop: Int
+  ) throws -> CGImage {
+    let screenWidth = Int(screen.frame.width)
+    let screenHeight = Int(screen.frame.height)
+    let finalHeight = screenHeight + marginTop
+
+    guard let context = CGContext(
+      data: nil,
+      width: screenWidth,
+      height: finalHeight,
+      bitsPerComponent: 8,
+      bytesPerRow: 0,
+      space: CGColorSpaceCreateDeviceRGB(),
+      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+    ) else {
+      throw ValidationError("Failed to create graphics context")
+    }
+
+    context.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
+    context.fill(CGRect(x: 0, y: 0, width: screenWidth, height: finalHeight))
+
+    let xOffset = (screenWidth - scaledSize.width) / 2
+    let imageRect = CGRect(x: xOffset, y: 0, width: scaledSize.width, height: scaledSize.height)
+    context.draw(cgImage, in: imageRect)
+
+    guard let finalImage = context.makeImage() else {
+      throw ValidationError("Failed to create final image")
+    }
+    return finalImage
+  }
+
+  /// Save a CGImage to disk as PNG
+  private func saveImage(_ cgImage: CGImage, to url: URL) throws {
+    guard let destination = CGImageDestinationCreateWithURL(
+      url as CFURL,
+      UTType.png.identifier as CFString,
+      1,
+      nil
+    ) else {
+      throw ValidationError("Failed to create image destination")
+    }
+
+    CGImageDestinationAddImage(destination, cgImage, nil)
+    guard CGImageDestinationFinalize(destination) else {
+      throw ValidationError("Failed to save manipulated image")
+    }
+  }
+
+  /// Create a manipulated version of the image with margin at the top
+  private func createManipulatedImage(
+    sourceURL: URL,
+    screen: NSScreen,
+    marginTop: Int
+  ) throws -> URL {
+    guard
+      let imageSource = CGImageSourceCreateWithURL(sourceURL as CFURL, nil),
+      let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil)
+    else {
+      throw ValidationError("Failed to load image")
+    }
+
+    let imageSize = CGSize(width: cgImage.width, height: cgImage.height)
+    let scaledSize = calculateScaledDimensions(imageSize: imageSize, screen: screen)
+    let finalImage = try renderImageWithMargin(
+      cgImage: cgImage,
+      scaledSize: scaledSize,
+      screen: screen,
+      marginTop: marginTop
+    )
+
+    let tempDir = try getTempWallpaperDirectory()
+    let timestamp = Date().timeIntervalSince1970
+    let outputURL = tempDir.appendingPathComponent("wallpaper-\(timestamp).png")
+
+    try saveImage(finalImage, to: outputURL)
+    return outputURL
+  }
 
   /// Calculate and display how the image will be scaled to fit the screen
   private func displayScalingInfo(imageURL: URL, screen: NSScreen, screenIndex: Int) {
@@ -75,6 +197,12 @@ struct Set: ParsableCommand {
   )
   var screen: Int?
 
+  @Option(
+    name: .long,
+    help: "Add a black margin at the top of the image with specified height in pixels"
+  )
+  var marginTop: Int?
+
   mutating func run() throws {
     let fileURL = URL(fileURLWithPath: imagePath)
     guard FileManager.default.fileExists(atPath: fileURL.path) else {
@@ -118,7 +246,21 @@ struct Set: ParsableCommand {
 
         displayScalingInfo(imageURL: fileURL, screen: screen, screenIndex: index)
 
-        try workspace.setDesktopImageURL(fileURL, for: screen, options: options)
+        // Create manipulated image if margin is specified
+        let imageToUse: URL
+        if let margin = marginTop {
+          print("Creating manipulated image with \(margin)px margin at top...")
+          imageToUse = try createManipulatedImage(
+            sourceURL: fileURL,
+            screen: screen,
+            marginTop: margin
+          )
+          print("Manipulated image saved to: \(imageToUse.path)")
+        } else {
+          imageToUse = fileURL
+        }
+
+        try workspace.setDesktopImageURL(imageToUse, for: screen, options: options)
         print("Wallpaper set successfully\n")
       } catch {
         let name = screen.localizedName
