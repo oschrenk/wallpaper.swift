@@ -30,40 +30,82 @@ struct Set: ParsableCommand {
     return wallpaperDir
   }
 
-  /// Calculate scaled dimensions for an image to fit screen
+  /// Calculate scaled dimensions for an image to fit screen (accounting for margin)
   private func calculateScaledDimensions(
     imageSize: CGSize,
-    screen: NSScreen
+    screen: NSScreen,
+    marginTop: Int
   ) -> (width: Int, height: Int) {
     let screenWidth = Int(screen.frame.width)
     let screenHeight = Int(screen.frame.height)
-    let imageAspect = imageSize.width / imageSize.height
-    let screenAspect = screen.frame.width / screen.frame.height
+    // Available height for image after accounting for margin
+    let availableHeight = screenHeight - marginTop
 
-    if imageAspect >= screenAspect {
-      let scaleFactor = screen.frame.height / imageSize.height
-      return (Int(imageSize.width * scaleFactor), screenHeight)
+    let imageAspect = imageSize.width / imageSize.height
+    let availableAspect = CGFloat(screenWidth) / CGFloat(availableHeight)
+
+    if imageAspect >= availableAspect {
+      // Image is wider - scale to match available height
+      let scaleFactor = CGFloat(availableHeight) / imageSize.height
+      return (Int(imageSize.width * scaleFactor), availableHeight)
     } else {
-      let scaleFactor = screen.frame.width / imageSize.width
+      // Image is taller - scale to match screen width
+      let scaleFactor = CGFloat(screenWidth) / imageSize.width
       return (screenWidth, Int(imageSize.height * scaleFactor))
     }
   }
 
-  /// Render image with margin into a CGImage
+  /// Create a path with rounded corners
+  private func createRoundedRectPath(rect: CGRect, cornerRadius: CGFloat) -> CGPath {
+    let path = CGMutablePath()
+    let maxRadius = min(rect.width, rect.height) / 2
+    let radius = min(cornerRadius, maxRadius)
+
+    path.move(to: CGPoint(x: rect.minX + radius, y: rect.minY))
+    path.addLine(to: CGPoint(x: rect.maxX - radius, y: rect.minY))
+    path.addArc(
+      tangent1End: CGPoint(x: rect.maxX, y: rect.minY),
+      tangent2End: CGPoint(x: rect.maxX, y: rect.minY + radius),
+      radius: radius
+    )
+    path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - radius))
+    path.addArc(
+      tangent1End: CGPoint(x: rect.maxX, y: rect.maxY),
+      tangent2End: CGPoint(x: rect.maxX - radius, y: rect.maxY),
+      radius: radius
+    )
+    path.addLine(to: CGPoint(x: rect.minX + radius, y: rect.maxY))
+    path.addArc(
+      tangent1End: CGPoint(x: rect.minX, y: rect.maxY),
+      tangent2End: CGPoint(x: rect.minX, y: rect.maxY - radius),
+      radius: radius
+    )
+    path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + radius))
+    path.addArc(
+      tangent1End: CGPoint(x: rect.minX, y: rect.minY),
+      tangent2End: CGPoint(x: rect.minX + radius, y: rect.minY),
+      radius: radius
+    )
+    path.closeSubpath()
+
+    return path
+  }
+
+  /// Render image with margin and optional rounded corners into a CGImage
   private func renderImageWithMargin(
     cgImage: CGImage,
     scaledSize: (width: Int, height: Int),
     screen: NSScreen,
-    marginTop: Int
+    marginTop: Int,
+    borderRadius: Int?
   ) throws -> CGImage {
     let screenWidth = Int(screen.frame.width)
     let screenHeight = Int(screen.frame.height)
-    let finalHeight = screenHeight + marginTop
 
     guard let context = CGContext(
       data: nil,
       width: screenWidth,
-      height: finalHeight,
+      height: screenHeight,
       bitsPerComponent: 8,
       bytesPerRow: 0,
       space: CGColorSpaceCreateDeviceRGB(),
@@ -72,11 +114,36 @@ struct Set: ParsableCommand {
       throw ValidationError("Failed to create graphics context")
     }
 
+    // Fill entire canvas with black
     context.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
-    context.fill(CGRect(x: 0, y: 0, width: screenWidth, height: finalHeight))
+    context.fill(CGRect(x: 0, y: 0, width: screenWidth, height: screenHeight))
 
+    // Available area for image (from y: 0 to y: screenHeight - marginTop)
+    let availableHeight = screenHeight - marginTop
+
+    // Position image at bottom, centered horizontally
     let xOffset = (screenWidth - scaledSize.width) / 2
-    let imageRect = CGRect(x: xOffset, y: 0, width: scaledSize.width, height: scaledSize.height)
+    let imageRect = CGRect(
+      x: xOffset,
+      y: 0,
+      width: scaledSize.width,
+      height: scaledSize.height
+    )
+
+    // Clip to available area first to prevent overflow into margin
+    let availableRect = CGRect(x: 0, y: 0, width: screenWidth, height: availableHeight)
+
+    if let radius = borderRadius, radius > 0 {
+      // Create clipping path that combines available area with rounded corners
+      let clippingRect = imageRect.intersection(availableRect)
+      let roundedPath = createRoundedRectPath(rect: clippingRect, cornerRadius: CGFloat(radius))
+      context.addPath(roundedPath)
+      context.clip()
+    } else {
+      // Just clip to available area
+      context.clip(to: availableRect)
+    }
+
     context.draw(cgImage, in: imageRect)
 
     guard let finalImage = context.makeImage() else {
@@ -102,11 +169,12 @@ struct Set: ParsableCommand {
     }
   }
 
-  /// Create a manipulated version of the image with margin at the top
+  /// Create a manipulated version of the image with margin and/or rounded corners
   private func createManipulatedImage(
     sourceURL: URL,
     screen: NSScreen,
-    marginTop: Int
+    marginTop: Int,
+    borderRadius: Int?
   ) throws -> URL {
     guard
       let imageSource = CGImageSourceCreateWithURL(sourceURL as CFURL, nil),
@@ -116,12 +184,17 @@ struct Set: ParsableCommand {
     }
 
     let imageSize = CGSize(width: cgImage.width, height: cgImage.height)
-    let scaledSize = calculateScaledDimensions(imageSize: imageSize, screen: screen)
+    let scaledSize = calculateScaledDimensions(
+      imageSize: imageSize,
+      screen: screen,
+      marginTop: marginTop
+    )
     let finalImage = try renderImageWithMargin(
       cgImage: cgImage,
       scaledSize: scaledSize,
       screen: screen,
-      marginTop: marginTop
+      marginTop: marginTop,
+      borderRadius: borderRadius
     )
 
     let tempDir = try getTempWallpaperDirectory()
@@ -130,6 +203,43 @@ struct Set: ParsableCommand {
 
     try saveImage(finalImage, to: outputURL)
     return outputURL
+  }
+
+  /// Set wallpaper for a single screen with optional manipulations
+  private func setWallpaperForScreen(
+    fileURL: URL,
+    screen: NSScreen,
+    screenIndex: Int,
+    workspace: NSWorkspace,
+    options: [NSWorkspace.DesktopImageOptionKey: Any]
+  ) throws {
+    displayScalingInfo(imageURL: fileURL, screen: screen, screenIndex: screenIndex)
+
+    // Create manipulated image if margin or border-radius is specified
+    let imageToUse: URL
+    if marginTop != nil || borderRadius != nil {
+      var manipulations: [String] = []
+      if let margin = marginTop {
+        manipulations.append("\(margin)px margin at top")
+      }
+      if let radius = borderRadius {
+        manipulations.append("\(radius)px border radius")
+      }
+      print("Creating manipulated image with \(manipulations.joined(separator: ", "))...")
+
+      imageToUse = try createManipulatedImage(
+        sourceURL: fileURL,
+        screen: screen,
+        marginTop: marginTop ?? 0,
+        borderRadius: borderRadius
+      )
+      print("Manipulated image saved to: \(imageToUse.path)")
+    } else {
+      imageToUse = fileURL
+    }
+
+    try workspace.setDesktopImageURL(imageToUse, for: screen, options: options)
+    print("Wallpaper set successfully\n")
   }
 
   /// Calculate and display how the image will be scaled to fit the screen
@@ -203,6 +313,12 @@ struct Set: ParsableCommand {
   )
   var marginTop: Int?
 
+  @Option(
+    name: .long,
+    help: "Apply rounded corners to the image with specified radius in pixels"
+  )
+  var borderRadius: Int?
+
   mutating func run() throws {
     let fileURL = URL(fileURLWithPath: imagePath)
     guard FileManager.default.fileExists(atPath: fileURL.path) else {
@@ -243,25 +359,13 @@ struct Set: ParsableCommand {
     for screen in screensToUpdate {
       do {
         let index = availableScreens.firstIndex(of: screen) ?? -1
-
-        displayScalingInfo(imageURL: fileURL, screen: screen, screenIndex: index)
-
-        // Create manipulated image if margin is specified
-        let imageToUse: URL
-        if let margin = marginTop {
-          print("Creating manipulated image with \(margin)px margin at top...")
-          imageToUse = try createManipulatedImage(
-            sourceURL: fileURL,
-            screen: screen,
-            marginTop: margin
-          )
-          print("Manipulated image saved to: \(imageToUse.path)")
-        } else {
-          imageToUse = fileURL
-        }
-
-        try workspace.setDesktopImageURL(imageToUse, for: screen, options: options)
-        print("Wallpaper set successfully\n")
+        try setWallpaperForScreen(
+          fileURL: fileURL,
+          screen: screen,
+          screenIndex: index,
+          workspace: workspace,
+          options: options
+        )
       } catch {
         let name = screen.localizedName
         print("Failed to set wallpaper for \(name): \(error.localizedDescription)")
