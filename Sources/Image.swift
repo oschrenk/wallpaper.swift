@@ -166,6 +166,42 @@ enum ImageManipulator {
 
     try saveImage(finalImage, to: outputURL)
   }
+
+  /// Prepare image with optional manipulations for wallpaper use
+  static func prepareImage(
+    sourceURL: URL,
+    screen: NSScreen,
+    marginTop: Int?,
+    borderRadius: Int?
+  ) throws -> URL {
+    // Return original if no manipulations needed
+    guard marginTop != nil || borderRadius != nil else {
+      return sourceURL
+    }
+
+    // Build description of manipulations
+    var manipulations: [String] = []
+    if let margin = marginTop {
+      manipulations.append("\(margin)px margin at top")
+    }
+    if let radius = borderRadius {
+      manipulations.append("\(radius)px border radius")
+    }
+    print("Creating manipulated image with \(manipulations.joined(separator: ", "))...")
+
+    // Create manipulated image
+    let outputURL = try Config.getTempWallpaperURL()
+    try createManipulatedImage(
+      sourceURL: sourceURL,
+      screen: screen,
+      marginTop: marginTop ?? 0,
+      borderRadius: borderRadius,
+      outputURL: outputURL
+    )
+    print("Manipulated image saved to: \(outputURL.path)")
+
+    return outputURL
+  }
 }
 
 /// Errors that can occur during image manipulation

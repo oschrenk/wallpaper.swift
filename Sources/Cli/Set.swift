@@ -10,40 +10,6 @@ struct Set: ParsableCommand {
     abstract: "Set wallpaper for one or more displays"
   )
 
-  /// Prepare image with optional manipulations
-  private func prepareImage(
-    sourceURL: URL,
-    screen: NSScreen
-  ) throws -> URL {
-    // Return original if no manipulations needed
-    guard marginTop != nil || borderRadius != nil else {
-      return sourceURL
-    }
-
-    // Build description of manipulations
-    var manipulations: [String] = []
-    if let margin = marginTop {
-      manipulations.append("\(margin)px margin at top")
-    }
-    if let radius = borderRadius {
-      manipulations.append("\(radius)px border radius")
-    }
-    print("Creating manipulated image with \(manipulations.joined(separator: ", "))...")
-
-    // Create manipulated image
-    let outputURL = try Config.getTempWallpaperURL()
-    try ImageManipulator.createManipulatedImage(
-      sourceURL: sourceURL,
-      screen: screen,
-      marginTop: marginTop ?? 0,
-      borderRadius: borderRadius,
-      outputURL: outputURL
-    )
-    print("Manipulated image saved to: \(outputURL.path)")
-
-    return outputURL
-  }
-
   /// Set wallpaper for a single screen
   private func setWallpaper(
     imageURL: URL,
@@ -115,7 +81,12 @@ struct Set: ParsableCommand {
     // Set wallpaper
     for screen in screensToUpdate {
       do {
-        let preparedImageURL = try prepareImage(sourceURL: fileURL, screen: screen)
+        let preparedImageURL = try ImageManipulator.prepareImage(
+          sourceURL: fileURL,
+          screen: screen,
+          marginTop: marginTop,
+          borderRadius: borderRadius
+        )
         try setWallpaper(
           imageURL: preparedImageURL,
           screen: screen,
