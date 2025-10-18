@@ -10,17 +10,6 @@ struct Set: ParsableCommand {
     abstract: "Set wallpaper for one or more displays"
   )
 
-  /// Set wallpaper for a single screen
-  private func setWallpaper(
-    imageURL: URL,
-    screen: NSScreen,
-    workspace: NSWorkspace,
-    options: [NSWorkspace.DesktopImageOptionKey: Any]
-  ) throws {
-    try workspace.setDesktopImageURL(imageURL, for: screen, options: options)
-    print("Wallpaper set successfully\n")
-  }
-
   @Argument(help: "Path to the image file")
   var imagePath: String
 
@@ -70,14 +59,6 @@ struct Set: ParsableCommand {
 
     let workspace = NSWorkspace.shared
 
-    // Configure wallpaper options
-    // imageScaling: .scaleProportionallyUpOrDown fills the entire screen while maintaining
-    // aspect ratio, centering the image and cropping any excess
-    let options: [NSWorkspace.DesktopImageOptionKey: Any] = [
-      .imageScaling: NSNumber(value: NSImageScaling.scaleProportionallyUpOrDown.rawValue),
-      .allowClipping: NSNumber(value: true),
-    ]
-
     // Set wallpaper
     for screen in screensToUpdate {
       do {
@@ -87,11 +68,10 @@ struct Set: ParsableCommand {
           marginTop: marginTop,
           borderRadius: borderRadius
         )
-        try setWallpaper(
+        try Wallpaper.setWallpaper(
           imageURL: preparedImageURL,
           screen: screen,
-          workspace: workspace,
-          options: options
+          workspace: workspace
         )
       } catch {
         let name = screen.localizedName
