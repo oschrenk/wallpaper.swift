@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 
 /// Image manipulation utilities for wallpaper processing
 enum ImageManipulator {
-  /// Calculate scaled dimensions for an image to fit screen (accounting for margin)
+  /// Calculate scaled dimensions for an image to fill screen and account for an added top margin
   static func calculateScaledDimensions(
     imageSize: CGSize,
     screen: NSScreen,
@@ -62,7 +62,9 @@ enum ImageManipulator {
     return path
   }
 
-  /// Render image with margin and optional rounded corners into a CGImage
+  /// Render image
+  /// - with (optional) margin
+  /// - with (optional) rounded corners
   static func renderImageWithMargin(
     cgImage: CGImage,
     scaledSize: (width: Int, height: Int),

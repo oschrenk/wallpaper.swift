@@ -36,12 +36,10 @@ struct Set: ParsableCommand {
   private func setWallpaperForScreen(
     fileURL: URL,
     screen: NSScreen,
-    screenIndex: Int,
+    screenIndex _: Int,
     workspace: NSWorkspace,
     options: [NSWorkspace.DesktopImageOptionKey: Any]
   ) throws {
-    displayScalingInfo(imageURL: fileURL, screen: screen, screenIndex: screenIndex)
-
     // Create manipulated image if margin or border-radius is specified
     let imageToUse: URL
     if marginTop != nil || borderRadius != nil {
@@ -67,62 +65,6 @@ struct Set: ParsableCommand {
 
     try workspace.setDesktopImageURL(imageToUse, for: screen, options: options)
     print("Wallpaper set successfully\n")
-  }
-
-  /// Calculate and display how the image will be scaled to fit the screen
-  private func displayScalingInfo(imageURL: URL, screen: NSScreen, screenIndex: Int) {
-    guard
-      let imageSource = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
-      let imageProperties = CGImageSourceCopyPropertiesAtIndex(
-        imageSource, 0, nil
-      ) as? [CFString: Any],
-      let imageWidth = imageProperties[kCGImagePropertyPixelWidth] as? CGFloat,
-      let imageHeight = imageProperties[kCGImagePropertyPixelHeight] as? CGFloat
-    else {
-      return
-    }
-
-    let screenWidth = screen.frame.width
-    let screenHeight = screen.frame.height
-    let name = screen.localizedName
-
-    let imageAspect = imageWidth / imageHeight
-    let screenAspect = screenWidth / screenHeight
-
-    // Determine image orientation
-    let imageOrientation: String
-    if imageAspect > 1.0 {
-      imageOrientation = "landscape"
-    } else if imageAspect < 1.0 {
-      imageOrientation = "portrait"
-    } else {
-      imageOrientation = "square"
-    }
-
-    // image orientation landscape (or square), will crop horizontally
-    if imageAspect >= screenAspect {
-      let scaleFactor = screenHeight / imageHeight
-      let scaledWidth = imageWidth * scaleFactor
-      let cropAmount = scaledWidth - screenWidth
-      let scaleDirection = scaleFactor > 1.0 ? "up" : scaleFactor < 1.0 ? "down" : "none"
-      print("Screen \(screenIndex) (\(name)):")
-      print("Image orientation: \(imageOrientation)")
-      print("Scaling factor: \(String(format: "%.2f", scaleFactor))x (\(scaleDirection))")
-      print("Image will be scaled to \(Int(scaledWidth))x\(Int(screenHeight)),")
-      print("Image cropping \(Int(cropAmount))px horizontally")
-    } else {
-      // image orientation portrait, will crop vertically
-      let scaleFactor = screenWidth / imageWidth
-      let scaledHeight = imageHeight * scaleFactor
-      let cropAmount = scaledHeight - screenHeight
-      let scaleDirection = scaleFactor > 1.0 ? "up" : scaleFactor < 1.0 ? "down" : "none"
-
-      print("Screen \(screenIndex) (\(name)):")
-      print("Image orientation: \(imageOrientation)")
-      print("Scaling factor: \(String(format: "%.2f", scaleFactor))x (\(scaleDirection))")
-      print("Image will be scaled to \(Int(screenWidth))x\(Int(scaledHeight)),")
-      print("Image cropping \(Int(cropAmount))px vertically")
-    }
   }
 
   @Argument(help: "Path to the image file")
