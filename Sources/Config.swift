@@ -19,4 +19,12 @@ enum Config {
 
     return wallpaperDir
   }
+
+  /// Generate a temporary wallpaper file URL with timestamp
+  static func getTempWallpaperURL() throws -> URL {
+    let tempDir = try getTempWallpaperDirectory()
+    let timestamp = Date().timeIntervalSince1970
+    let outputURL = tempDir.appendingPathComponent("wallpaper-\(timestamp).png")
+    return outputURL
+  }
 }

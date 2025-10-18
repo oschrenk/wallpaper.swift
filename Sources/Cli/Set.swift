@@ -10,28 +10,6 @@ struct Set: ParsableCommand {
     abstract: "Set wallpaper for one or more displays"
   )
 
-  /// Create a manipulated version of the image with margin and/or rounded corners
-  private func createManipulatedImage(
-    sourceURL: URL,
-    screen: NSScreen,
-    marginTop: Int,
-    borderRadius: Int?
-  ) throws -> URL {
-    let tempDir = try Config.getTempWallpaperDirectory()
-    let timestamp = Date().timeIntervalSince1970
-    let outputURL = tempDir.appendingPathComponent("wallpaper-\(timestamp).png")
-
-    try ImageManipulator.createManipulatedImage(
-      sourceURL: sourceURL,
-      screen: screen,
-      marginTop: marginTop,
-      borderRadius: borderRadius,
-      outputURL: outputURL
-    )
-
-    return outputURL
-  }
-
   /// Set wallpaper for a single screen with optional manipulations
   private func setWallpaperForScreen(
     fileURL: URL,
@@ -52,12 +30,15 @@ struct Set: ParsableCommand {
       }
       print("Creating manipulated image with \(manipulations.joined(separator: ", "))...")
 
-      imageToUse = try createManipulatedImage(
+      let outputURL = try Config.getTempWallpaperURL()
+      try ImageManipulator.createManipulatedImage(
         sourceURL: fileURL,
         screen: screen,
         marginTop: marginTop ?? 0,
-        borderRadius: borderRadius
+        borderRadius: borderRadius,
+        outputURL: outputURL
       )
+      imageToUse = outputURL
       print("Manipulated image saved to: \(imageToUse.path)")
     } else {
       imageToUse = fileURL
