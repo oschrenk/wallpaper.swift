@@ -10,25 +10,6 @@ struct Set: ParsableCommand {
     abstract: "Set wallpaper for one or more displays"
   )
 
-  /// Get or create the temporary wallpaper directory
-  private func getTempWallpaperDirectory() throws -> URL {
-    let homeDir = FileManager.default.homeDirectoryForCurrentUser
-    let wallpaperDir = homeDir
-      .appendingPathComponent(".local")
-      .appendingPathComponent("share")
-      .appendingPathComponent("wallpaper")
-
-    if !FileManager.default.fileExists(atPath: wallpaperDir.path) {
-      try FileManager.default.createDirectory(
-        at: wallpaperDir,
-        withIntermediateDirectories: true,
-        attributes: nil
-      )
-    }
-
-    return wallpaperDir
-  }
-
   /// Create a manipulated version of the image with margin and/or rounded corners
   private func createManipulatedImage(
     sourceURL: URL,
@@ -36,7 +17,7 @@ struct Set: ParsableCommand {
     marginTop: Int,
     borderRadius: Int?
   ) throws -> URL {
-    let tempDir = try getTempWallpaperDirectory()
+    let tempDir = try Config.getTempWallpaperDirectory()
     let timestamp = Date().timeIntervalSince1970
     let outputURL = tempDir.appendingPathComponent("wallpaper-\(timestamp).png")
 
