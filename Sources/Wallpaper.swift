@@ -7,7 +7,7 @@ enum Wallpaper {
   static func setWallpaper(
     imageURL: URL,
     screen: NSScreen,
-    workspace: NSWorkspace
+    workspace: NSWorkspace = .shared
   ) throws {
     // Configure wallpaper options
     // imageScaling: .scaleProportionallyUpOrDown fills the entire screen while maintaining

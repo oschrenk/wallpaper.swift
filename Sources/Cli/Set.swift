@@ -57,8 +57,6 @@ struct Set: ParsableCommand {
       screensToUpdate = availableScreens
     }
 
-    let workspace = NSWorkspace.shared
-
     // Set wallpaper
     for screen in screensToUpdate {
       do {
@@ -70,8 +68,7 @@ struct Set: ParsableCommand {
         )
         try Wallpaper.setWallpaper(
           imageURL: preparedImageURL,
-          screen: screen,
-          workspace: workspace
+          screen: screen
         )
       } catch {
         let name = screen.localizedName

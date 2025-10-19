@@ -7,22 +7,20 @@ enum ImageManipulator {
   /// Calculate scaled dimensions for an image to fill screen and account for an added top margin
   static func calculateScaledDimensions(
     imageSize: CGSize,
-    screen: NSScreen,
+    screenDimension: Dimension,
     marginTop: Int
-  ) -> (width: Int, height: Int) {
-    let screenWidth = Int(screen.frame.width)
-    let screenHeight = Int(screen.frame.height)
-    let availableHeight = screenHeight - marginTop
+  ) -> Dimension {
+    let availableHeight = screenDimension.height - marginTop
 
     let imageAspect = imageSize.width / imageSize.height
-    let availableAspect = CGFloat(screenWidth) / CGFloat(availableHeight)
+    let availableAspect = CGFloat(screenDimension.width) / CGFloat(availableHeight)
 
     if imageAspect >= availableAspect {
       let scaleFactor = CGFloat(availableHeight) / imageSize.height
-      return (Int(imageSize.width * scaleFactor), availableHeight)
+      return Dimension(width: Int(imageSize.width * scaleFactor), height: availableHeight)
     } else {
-      let scaleFactor = CGFloat(screenWidth) / imageSize.width
-      return (screenWidth, Int(imageSize.height * scaleFactor))
+      let scaleFactor = CGFloat(screenDimension.width) / imageSize.width
+      return Dimension(width: screenDimension.width, height: Int(imageSize.height * scaleFactor))
     }
   }
 
@@ -67,18 +65,15 @@ enum ImageManipulator {
   /// - with (optional) rounded corners
   static func renderImageWithMargin(
     cgImage: CGImage,
-    scaledSize: (width: Int, height: Int),
-    screen: NSScreen,
+    scaledSize: Dimension,
+    screenDimension: Dimension,
     marginTop: Int,
     borderRadius: Int?
   ) throws -> CGImage {
-    let screenWidth = Int(screen.frame.width)
-    let screenHeight = Int(screen.frame.height)
-
     guard let context = CGContext(
       data: nil,
-      width: screenWidth,
-      height: screenHeight,
+      width: screenDimension.width,
+      height: screenDimension.height,
       bitsPerComponent: 8,
       bytesPerRow: 0,
       space: CGColorSpaceCreateDeviceRGB(),
@@ -88,10 +83,10 @@ enum ImageManipulator {
     }
 
     context.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
-    context.fill(CGRect(x: 0, y: 0, width: screenWidth, height: screenHeight))
+    context.fill(CGRect(x: 0, y: 0, width: screenDimension.width, height: screenDimension.height))
 
-    let availableHeight = screenHeight - marginTop
-    let xOffset = (screenWidth - scaledSize.width) / 2
+    let availableHeight = screenDimension.height - marginTop
+    let xOffset = (screenDimension.width - scaledSize.width) / 2
     let imageRect = CGRect(
       x: xOffset,
       y: 0,
@@ -99,7 +94,7 @@ enum ImageManipulator {
       height: scaledSize.height
     )
 
-    let availableRect = CGRect(x: 0, y: 0, width: screenWidth, height: availableHeight)
+    let availableRect = CGRect(x: 0, y: 0, width: screenDimension.width, height: availableHeight)
 
     if let radius = borderRadius, radius > 0 {
       let clippingRect = imageRect.intersection(availableRect)
@@ -138,7 +133,7 @@ enum ImageManipulator {
   /// Create a manipulated version of the image with margin and/or rounded corners
   static func createManipulatedImage(
     sourceURL: URL,
-    screen: NSScreen,
+    screenDimension: Dimension,
     marginTop: Int,
     borderRadius: Int?,
     outputURL: URL
@@ -153,13 +148,13 @@ enum ImageManipulator {
     let imageSize = CGSize(width: cgImage.width, height: cgImage.height)
     let scaledSize = calculateScaledDimensions(
       imageSize: imageSize,
-      screen: screen,
+      screenDimension: screenDimension,
       marginTop: marginTop
     )
     let finalImage = try renderImageWithMargin(
       cgImage: cgImage,
       scaledSize: scaledSize,
-      screen: screen,
+      screenDimension: screenDimension,
       marginTop: marginTop,
       borderRadius: borderRadius
     )
@@ -190,10 +185,11 @@ enum ImageManipulator {
     print("Creating manipulated image with \(manipulations.joined(separator: ", "))...")
 
     // Create manipulated image
+    let screenDimension = Dimension(screen.frame.size)
     let outputURL = try Config.getTempWallpaperURL()
     try createManipulatedImage(
       sourceURL: sourceURL,
-      screen: screen,
+      screenDimension: screenDimension,
       marginTop: marginTop ?? 0,
       borderRadius: borderRadius,
       outputURL: outputURL
