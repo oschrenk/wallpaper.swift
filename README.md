@@ -1,6 +1,12 @@
 # Wallpaper
 
-Set wallpaper via CLI. Optionally create rounded corners.
+Create wallpapers with rounded corners.
+
+Are you annoyed by macOS 26 rounded corners?
+Or maybe you embrace them but don't enjoy having a colorful wallpaper peek through?
+Are you a sketchybar user and would like to create a consistent look?
+
+This CLI will take a wallpaper and re-create it with black (feel free to issue a PR to support other colors)
 
 ## Usage
 
@@ -27,3 +33,7 @@ wallpaper set --border-radius 20px,20px,10px,10px image.jpg
 # set wallpaper with top margin
 wallpaper set --top-margin 20px image.jpg
 ```
+
+## AI
+
+Claude Code was used to create parts of this tool.
