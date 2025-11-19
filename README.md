@@ -34,6 +34,14 @@ wallpaper set --border-radius 20px,20px,10px,10px image.jpg
 wallpaper set --top-margin 20px image.jpg
 ```
 
+## Installation
+
+**Via Homebrew**
+
+```
+brew install oschrenk/made/wallpaper
+```
+
 ## AI
 
 Claude Code was used to create parts of this tool.
