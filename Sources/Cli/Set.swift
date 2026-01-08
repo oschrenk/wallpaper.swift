@@ -31,6 +31,12 @@ struct Set: ParsableCommand {
   )
   var borderRadius: Int?
 
+  @Option(
+    name: .long,
+    help: "Add a black border at the bottom with specified thickness in pixels (default: 0)"
+  )
+  var borderBottom: Int?
+
   mutating func run() throws {
     let fileURL = URL(fileURLWithPath: imagePath)
     guard FileManager.default.fileExists(atPath: fileURL.path) else {
@@ -64,7 +70,8 @@ struct Set: ParsableCommand {
           sourceURL: fileURL,
           screen: screen,
           marginTop: marginTop,
-          borderRadius: borderRadius
+          borderRadius: borderRadius,
+          borderBottom: borderBottom
         )
         try Wallpaper.setWallpaper(
           imageURL: preparedImageURL,

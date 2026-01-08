@@ -25,6 +25,15 @@ wallpaper set --border-radius 20 image.jpg
 
 # set wallpaper with top margin
 wallpaper set --top-margin 32 image.jpg
+
+# set wallpaper with 1px black border at bottom
+wallpaper set --border-bottom 1 image.jpg
+
+# set wallpaper with 5px black border at bottom
+wallpaper set --border-bottom 5 image.jpg
+
+# combine multiple options
+wallpaper set --margin-top 100 --border-radius 20 --border-bottom 2 image.jpg
 ```
 
 ## Installation

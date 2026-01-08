@@ -63,12 +63,14 @@ enum ImageManipulator {
   /// Render image
   /// - with (optional) margin
   /// - with (optional) rounded corners
+  /// - with (optional) border at bottom
   static func renderImageWithMargin(
     cgImage: CGImage,
     scaledSize: Dimension,
     screenDimension: Dimension,
     marginTop: Int,
-    borderRadius: Int?
+    borderRadius: Int?,
+    borderBottom: Int
   ) throws -> CGImage {
     guard let context = CGContext(
       data: nil,
@@ -107,6 +109,19 @@ enum ImageManipulator {
 
     context.draw(cgImage, in: imageRect)
 
+    // Draw border at bottom if specified
+    if borderBottom > 0 {
+      context.resetClip()
+      context.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
+      let borderRect = CGRect(
+        x: 0,
+        y: 0,
+        width: screenDimension.width,
+        height: borderBottom
+      )
+      context.fill(borderRect)
+    }
+
     guard let finalImage = context.makeImage() else {
       throw ImageError.failedToCreateFinalImage
     }
@@ -136,6 +151,7 @@ enum ImageManipulator {
     screenDimension: Dimension,
     marginTop: Int,
     borderRadius: Int?,
+    borderBottom: Int,
     outputURL: URL
   ) throws {
     guard
@@ -156,7 +172,8 @@ enum ImageManipulator {
       scaledSize: scaledSize,
       screenDimension: screenDimension,
       marginTop: marginTop,
-      borderRadius: borderRadius
+      borderRadius: borderRadius,
+      borderBottom: borderBottom
     )
 
     try saveImage(finalImage, to: outputURL)
@@ -167,10 +184,11 @@ enum ImageManipulator {
     sourceURL: URL,
     screen: NSScreen,
     marginTop: Int?,
-    borderRadius: Int?
+    borderRadius: Int?,
+    borderBottom: Int?
   ) throws -> URL {
     // Return original if no manipulations needed
-    guard marginTop != nil || borderRadius != nil else {
+    guard marginTop != nil || borderRadius != nil || borderBottom != nil else {
       return sourceURL
     }
 
@@ -182,6 +200,9 @@ enum ImageManipulator {
     if let radius = borderRadius {
       manipulations.append("\(radius)px border radius")
     }
+    if let border = borderBottom, border > 0 {
+      manipulations.append("\(border)px border at bottom")
+    }
     print("Creating manipulated image with \(manipulations.joined(separator: ", "))...")
 
     // Create manipulated image
@@ -192,6 +213,7 @@ enum ImageManipulator {
       screenDimension: screenDimension,
       marginTop: marginTop ?? 0,
       borderRadius: borderRadius,
+      borderBottom: borderBottom ?? 0,
       outputURL: outputURL
     )
     print("Manipulated image saved to: \(outputURL.path)")
