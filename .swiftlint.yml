@@ -28,3 +28,6 @@ nesting:
     error: 2
 trailing_comma:
   mandatory_comma: true
+function_parameter_count:
+  warning: 6
+  error: 8
