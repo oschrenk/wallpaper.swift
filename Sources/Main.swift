@@ -6,9 +6,10 @@ import Foundation
 ///
 /// This the main entry point
 @main
-struct Main: ParsableCommand {
+struct Wallpaper: ParsableCommand {
   static var configuration = CommandConfiguration(
-    abstract: "wallpaper",
+    commandName: "wallpaper",
+    abstract: "Manage desktop wallpaper on macOS",
     subcommands: [
       Set.self,
       Screens.self,

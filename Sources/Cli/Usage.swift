@@ -20,7 +20,7 @@ struct Usage: ParsableCommand {
     if version {
       print(Version.value)
     } else {
-      print(Main.helpMessage())
+      print(Wallpaper.helpMessage())
     }
   }
 }

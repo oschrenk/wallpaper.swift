@@ -73,7 +73,7 @@ struct Set: ParsableCommand {
           borderRadius: borderRadius,
           borderBottom: borderBottom
         )
-        try Wallpaper.setWallpaper(
+        try WallpaperService.setWallpaper(
           imageURL: preparedImageURL,
           screen: screen
         )

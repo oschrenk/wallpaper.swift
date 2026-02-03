@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 
 /// Wallpaper setting utilities
-enum Wallpaper {
+enum WallpaperService {
   /// Set wallpaper for a single screen
   static func setWallpaper(
     imageURL: URL,
