@@ -10,8 +10,9 @@
         in
         pkgs.mkShell {
           packages = with pkgs; [
-            go-task # task runner 
+            go-task # task runner
             swiftlint # swift, lint
+            swiftformat # swift, format
           ];
         };
     };
